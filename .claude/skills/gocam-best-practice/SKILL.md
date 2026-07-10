@@ -35,13 +35,11 @@ An activity unit is the fundamental building block of GO-CAM models:
 
 ## Annotation Guidelines by Activity Type
 
-The `.claude/skills/gocam-best-practice/references/` directory contains detailed guidelines for specific annotation scenarios. Load these files when working with the corresponding activity types.
-
-A comprehensive overview of all GO-CAM guidelines is in `.claude/skills/gocam-best-practice/SP-GOCAM-guidelines-2025-02-06.md` — read this first for unfamiliar annotation scenarios.
+The `references/` directory contains detailed guidelines for specific annotation scenarios. Load these files when working with the corresponding activity types:
 
 ### Core Guidelines
 
-- **SP-GOCAM-guidelines-2025-02-06.md** (skill root): Comprehensive GO-CAM guidelines — Noctua setup, activity units, causal relations, PTMs, receptors, adaptors, sequestering proteins, complexes, transporters
+- **GO-CAM_annotation_guidelines_README.md**: Overview of GO-CAM annotation principles
 - **How_to_annotate_complexes_in_GO-CAM.md**: When and how to represent protein complexes
 
 ### Specific Molecular Function Types
@@ -77,6 +75,39 @@ Use 'has input' to specify:
 
 **Important**: For receptors, 'has input' specifies the downstream effector, NOT the ligand.
 
+### Distinct Individuals for Distinct Roles (do NOT reuse instances)
+
+Every role a molecule plays needs its **own individual**, even when it is the
+same molecular entity (same UniProtKB/MOD/complex ID). In particular, a molecule
+that is the **`has input`** (RO:0002233) of one activity and the **`enabled by`**
+(RO:0002333) of another activity must be represented as **two separate
+individuals** of that class — never a single shared instance.
+
+Concrete example: a chaperone folds actin (chaperone activity `has input` actin),
+and folded actin then `enables` a downstream structural activity. Create two
+actin individuals — one as the chaperone's input, a separate one as the enabler
+of the downstream activity.
+
+**Why this matters:** an activity unit is anchored on its enabler individual.
+Reusing one individual across an input role and an enabler role entangles the two
+activity units so they can no longer be cleanly separated. The Noctua graph
+editor still draws every raw triple, but the Visual Pathway Editor (VPE) — which
+reconstructs the activity-flow view from enabler individuals — silently **drops
+the causal edge** between the two activities. Distinct instances make the
+activities separable and the causal arrow renders correctly.
+
+**How to build it with barista:** assign a distinct variable per role, e.g.
+
+```bash
+# chaperone's input: its own actin instance
+barista add-individual -m $MODEL --class UniProtKB:P60709 --assign actin_input --session s
+barista add-fact -m $MODEL -s chaperone_mf -t actin_input -p RO:0002233 --session s  # has input
+
+# downstream activity's enabler: a SEPARATE actin instance
+barista add-individual -m $MODEL --class UniProtKB:P60709 --assign actin_enabler --session s
+barista add-fact -m $MODEL -s actin_mf -t actin_enabler -p RO:0002333 --session s    # enabled by
+```
+
 ### Complex Representation
 
 Three approaches based on knowledge:
@@ -101,7 +132,7 @@ Always include:
 5. **Connect activities**: Use `barista add-fact` to create causal relationships
 6. **Add context**: Specify inputs, locations, and processes
 7. **Add evidence**: Support all facts with evidence codes and references
-8. **Validate**: Check against guidelines in `.claude/skills/gocam-best-practice/references/`
+8. **Validate**: Check against guidelines in `references/` files
 9. **Export and review**: Export the model to review its structure
 
 ## Reference File Usage Strategy
@@ -114,6 +145,7 @@ Before finalizing a GO-CAM model, verify:
 - [ ] All activities have appropriate molecular function terms
 - [ ] Causal relations match the biological mechanism (direct vs. indirect)
 - [ ] 'has input' relations specify the correct targets
+- [ ] No individual is reused across roles: a molecule that is both a 'has input' and an 'enabled by' has a **separate individual for each role** (shared instances break VPE causal-edge rendering)
 - [ ] Cellular components are specified with 'occurs in'
 - [ ] Activities are connected to biological processes with 'part of'
 - [ ] All facts have supporting evidence
@@ -137,7 +169,7 @@ barista add-individual --model $MODEL_ID --class GO:0004674 --assign kinase
 # Connect with causal relationship
 barista add-fact --model $MODEL_ID \
   --subject receptor --object kinase \
-  --predicate RO:0002413  # directly positively regulates
+  --predicate RO:0002629  # directly positively regulates
 ```
 
 ### Example 2: Transcription Factor with Target Gene
@@ -184,10 +216,12 @@ barista add-fact --model $MODEL_ID \
 - Missing evidence codes and references
 - Using generic terms when specific child terms are available
 - Incorrect causal relation directionality
+- Reusing one individual for both a 'has input' and an 'enabled by' role (create a distinct individual per role, even for the same molecular entity — see "Distinct Individuals for Distinct Roles")
+- Likewise for BPs: each MF should be connected to a distinct instance of a BP
 
 ## Getting Help
 
-- Check relevant guideline files in `.claude/skills/gocam-best-practice/references/`
+- Check relevant guideline files in `references/` directory
 - Search for similar examples using `barista list-models`
 - Export and examine well-annotated models for patterns
 - Consult the GO Consortium documentation
@@ -195,7 +229,7 @@ barista add-fact --model $MODEL_ID \
 
 ## Reference Files Summary
 
-Load these files from `.claude/skills/gocam-best-practice/references/` as needed:
+Load these files from the `references/` directory as needed:
 
 - How_to_annotate_complexes_in_GO-CAM.md
 - How_to_annotate_molecular_adaptors.md
